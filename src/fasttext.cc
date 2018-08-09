@@ -325,6 +325,8 @@ void FastText::quantize(const Args qargs) {
   }
 }
 
+// https://heleifz.github.io/14732610572844.html
+
 void FastText::supervised(
     Model& model,
     real lr,
@@ -570,8 +572,12 @@ void FastText::analogies(int32_t k) {
 
 void FastText::trainThread(int32_t threadId) {
   std::ifstream ifs(args_->input);
+  // 根据线程数，将训练文件按照总字节数（utils::size）均分成多个部分
+  // 这么做的一个后果是，每一部分的第一个词有可能从中间被切断，
+  // 这样的"小噪音"对于整体的训练结果无影响
   utils::seek(ifs, threadId * utils::size(ifs) / args_->thread);
 
+  //模型并行
   Model model(input_, output_, args_, threadId);
   if (args_->model == model_name::sup) {
     model.setTargetCounts(dict_->getCounts(entry_type::label));
@@ -580,25 +586,35 @@ void FastText::trainThread(int32_t threadId) {
   }
 
   const int64_t ntokens = dict_->ntokens();
+  // 当前线程处理完毕的 token 总数
   int64_t localTokenCount = 0;
   std::vector<int32_t> line, labels;
+
+  // tokenCount_ 为所有线程处理完毕的 token 总数
+  // 当处理了 args_->epoch 遍所有 token 后，训练结束 
+  // 每个训练线程在更新参数时并没有加锁，这会给参数更新带来一些噪音，
+  // 但是不会影响最终的结果。无论是 google 的 word2vec 实现，还是 fastText 库，都没有加锁。
   while (tokenCount_ < args_->epoch * ntokens) {
     real progress = real(tokenCount_) / (args_->epoch * ntokens);
+    // 学习率根据 progress 线性下降
     real lr = args_->lr * (1.0 - progress);
-    if (args_->model == model_name::sup) {
+    if (args_->model == model_name::sup) {     // sup
       localTokenCount += dict_->getLine(ifs, line, labels);
       supervised(model, lr, line, labels);
-    } else if (args_->model == model_name::cbow) {
+    } else if (args_->model == model_name::cbow) {// cbow
       localTokenCount += dict_->getLine(ifs, line, model.rng);
       cbow(model, lr, line);
-    } else if (args_->model == model_name::sg) {
+    } else if (args_->model == model_name::sg) { // skipgram
       localTokenCount += dict_->getLine(ifs, line, model.rng);
       skipgram(model, lr, line);
     }
+    // args_->lrUpdateRate 是每个线程学习率的变化率，默认为 100，
+    // 它的作用是，每处理一定的行数，再更新全局的 tokenCount 变量，从而影响学习率
     if (localTokenCount > args_->lrUpdateRate) {
       tokenCount_ += localTokenCount;
       localTokenCount = 0;
       if (threadId == 0 && args_->verbose > 1)
+        // 0号线程更新loss值，准备输出
         loss_ = model.getLoss();
     }
   }
@@ -659,12 +675,16 @@ void FastText::train(const Args args) {
     throw std::invalid_argument(
         args_->input + " cannot be opened for training!");
   }
+  //构建词表
   dict_->readFromFile(ifs);
   ifs.close();
 
   if (args_->pretrainedVectors.size() != 0) {
     loadVectors(args_->pretrainedVectors);
   } else {
+   // fastText 用了word n-gram 作为输入，所以输入矩阵的大小为 (nwords + ngram 种类) * dim
+   // 代码中，所有 word n-gram 都被 hash 到固定数目的 bucket 中，所以输入矩阵的大小为
+   // (nwords + bucket 个数) * dim
     input_ = std::make_shared<Matrix>(dict_->nwords()+args_->bucket, args_->dim);
     input_->uniform(1.0 / args_->dim);
   }
@@ -676,7 +696,7 @@ void FastText::train(const Args args) {
   }
   output_->zero();
   startThreads();
-  model_ = std::make_shared<Model>(input_, output_, args_, 0);
+  model_ = std::make_shared<Model>(input_, output_, args_, 0);// 训练好的模型
   if (args_->model == model_name::sup) {
     model_->setTargetCounts(dict_->getCounts(entry_type::label));
   } else {
@@ -694,6 +714,7 @@ void FastText::startThreads() {
   }
   const int64_t ntokens = dict_->ntokens();
   // Same condition as trainThread
+  // 主线程向屏幕打印训练进度
   while (tokenCount_ < args_->epoch * ntokens) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     if (loss_ >= 0 && args_->verbose > 1) {
@@ -705,6 +726,7 @@ void FastText::startThreads() {
   for (int32_t i = 0; i < args_->thread; i++) {
     threads[i].join();
   }
+  // 训练结束
   if (args_->verbose > 0) {
       std::cerr << "\r";
       printInfo(1.0, loss_, std::cerr);

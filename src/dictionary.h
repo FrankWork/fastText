@@ -29,7 +29,7 @@ struct entry {
   std::string word;
   int64_t count;
   entry_type type;
-  std::vector<int32_t> subwords;
+  std::vector<int32_t> subwords;// store hash value of ngram
 };
 
 class Dictionary {
@@ -39,6 +39,7 @@ class Dictionary {
 
     int32_t find(const std::string&) const;
     int32_t find(const std::string&, uint32_t h) const;
+    // 计算词的丢弃概率，（用来丢弃高频词）
     void initTableDiscard();
     void initNgrams();
     void reset(std::istream&) const;
@@ -56,7 +57,7 @@ class Dictionary {
     int64_t ntokens_;
 
     int64_t pruneidx_size_;
-    std::unordered_map<int32_t, int32_t> pruneidx_;
+    std::unordered_map<int32_t, int32_t> pruneidx_;//TODO
     void addWordNgrams(
         std::vector<int32_t>& line,
         const std::vector<int32_t>& hashes,
@@ -102,6 +103,7 @@ class Dictionary {
         const;
     int32_t getLine(std::istream&, std::vector<int32_t>&,
                     std::minstd_rand&) const;
+    // 从词表中删除频数较小的词
     void threshold(int64_t, int64_t);
     void prune(std::vector<int32_t>&);
     bool isPruned() { return pruneidx_size_ >= 0; }

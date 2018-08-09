@@ -181,6 +181,8 @@ void Dictionary::computeSubwords(const std::string& word,
                                std::vector<int32_t>& ngrams) const {
   for (size_t i = 0; i < word.size(); i++) {
     std::string ngram;
+    // checking to see if the top two bits of the value are not equal to 10
+    // in UTF-8, all bytes that begin with the bit pattern 10 are subsequent bytes of a multi-byte sequence
     if ((word[i] & 0xC0) == 0x80) continue;
     for (size_t j = i, n = 1; j < word.size() && n <= args_->maxn; n++) {
       ngram.push_back(word[j++]);
@@ -243,10 +245,12 @@ void Dictionary::readFromFile(std::istream& in) {
     }
     if (size_ > 0.75 * MAX_VOCAB_SIZE) {
       minThreshold++;
+    // 从词表中删除频数较小的词
       threshold(minThreshold, minThreshold);
     }
   }
   threshold(args_->minCount, args_->minCountLabel);
+  // 计算词的丢弃概率，（用来丢弃高频词）
   initTableDiscard();
   initNgrams();
   if (args_->verbose > 0) {

@@ -32,7 +32,7 @@ class Args {
     double lr;
     int lrUpdateRate;
     int dim;
-    int ws;
+    int ws;//size of the context window [5]
     int epoch;
     int minCount;
     int minCountLabel;

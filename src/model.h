@@ -40,8 +40,8 @@ class Model {
     Vector hidden_;
     Vector output_;
     Vector grad_;
-    int32_t hsz_;
-    int32_t osz_;
+    int32_t hsz_; // hidden size
+    int32_t osz_; // output size
     real loss_;
     int64_t nexamples_;
     std::vector<real> t_sigmoid_;
@@ -95,7 +95,7 @@ class Model {
     real log(real) const;
     real std_log(real) const;
 
-    std::minstd_rand rng;
+    std::minstd_rand rng;//线性同余法随机数
     bool quant_;
     void setQuantizePointer(std::shared_ptr<QMatrix>, std::shared_ptr<QMatrix>, bool);
 };

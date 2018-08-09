@@ -43,7 +43,7 @@ class FastText {
 
   std::shared_ptr<Model> model_;
 
-  std::atomic<int64_t> tokenCount_;
+  std::atomic<int64_t> tokenCount_; // atomic 线程安全
   std::atomic<real> loss_;
 
   std::chrono::steady_clock::time_point start_;
