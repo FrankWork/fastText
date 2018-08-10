@@ -32,10 +32,10 @@ struct Node {
 
 class Model {
   protected:
-    std::shared_ptr<Matrix> wi_;
-    std::shared_ptr<Matrix> wo_;
-    std::shared_ptr<QMatrix> qwi_;
-    std::shared_ptr<QMatrix> qwo_;
+    std::shared_ptr<Matrix> wi_; // input word vector
+    std::shared_ptr<Matrix> wo_; // output word/label vector
+    std::shared_ptr<QMatrix> qwi_; // quantized `wi_`, for command `fasttext quantize` 
+    std::shared_ptr<QMatrix> qwo_; // quantized `wo_`
     std::shared_ptr<Args> args_;
     Vector hidden_;
     Vector output_;

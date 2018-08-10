@@ -53,11 +53,16 @@ void Model::setQuantizePointer(std::shared_ptr<QMatrix> qwi,
   }
 }
 
+// 前向和后向 
 real Model::binaryLogistic(int32_t target, bool label, real lr) {
+  // 内积，sigmoid
   real score = sigmoid(wo_->dotRow(hidden_, target));
   real alpha = lr * (real(label) - score);
+  // Loss 对于 hidden_ 的梯度累加到 grad_ 上
   grad_.addRow(*wo_, target, alpha);
+  // Loss 对于 LR 参数的梯度累加到 wo_ 的对应行上
   wo_->addRow(hidden_, target, alpha);
+  // 交叉熵
   if (label) {
     return -log(score);
   } else {
@@ -65,9 +70,12 @@ real Model::binaryLogistic(int32_t target, bool label, real lr) {
   }
 }
 
+// 负采样
 real Model::negativeSampling(int32_t target, real lr) {
   real loss = 0.0;
   grad_.zero();
+
+  // 对于正样本和负样本，分别更新 LR
   for (int32_t n = 0; n <= args_->neg; n++) {
     if (n == 0) {
       loss += binaryLogistic(target, true, lr);
@@ -78,10 +86,13 @@ real Model::negativeSampling(int32_t target, real lr) {
   return loss;
 }
 
+// 层次softmax
 real Model::hierarchicalSoftmax(int32_t target, real lr) {
   real loss = 0.0;
   grad_.zero();
+  // 先确定霍夫曼树上的路径
   const std::vector<bool>& binaryCode = codes[target];
+  // 分别对路径上的中间节点做 LR
   const std::vector<int32_t>& pathToRoot = paths[target];
   for (int32_t i = 0; i < pathToRoot.size(); i++) {
     loss += binaryLogistic(pathToRoot[i], binaryCode[i], lr);
@@ -112,6 +123,7 @@ void Model::computeOutputSoftmax() {
   computeOutputSoftmax(hidden_, output_);
 }
 
+// 普通softmax损失
 real Model::softmax(int32_t target, real lr) {
   grad_.zero();
   computeOutputSoftmax();
@@ -151,6 +163,7 @@ void Model::predict(const std::vector<int32_t>& input, int32_t k, real threshold
   if (args_->model != model_name::sup) {
     throw std::invalid_argument("Model needs to be supervised for prediction!");
   }
+  // 分配k+1个空间
   heap.reserve(k + 1);
   computeHidden(input, hidden);
   if (args_->loss == loss_name::hs) {
@@ -158,6 +171,7 @@ void Model::predict(const std::vector<int32_t>& input, int32_t k, real threshold
   } else {
     findKBest(k, threshold, heap, hidden, output);
   }
+  // 因为 heap 中虽然一定是 top-k，但并没有排好序
   std::sort_heap(heap.begin(), heap.end(), comparePairs);
 }
 
@@ -176,6 +190,7 @@ void Model::findKBest(
   std::vector<std::pair<real, int32_t>>& heap,
   Vector& hidden, Vector& output
 ) const {
+  // 计算结果数组
   computeOutputSoftmax(hidden, output);
   for (int32_t i = 0; i < osz_; i++) {
     if (output[i] < threshold) continue;
@@ -225,7 +240,10 @@ void Model::update(const std::vector<int32_t>& input, int32_t target, real lr) {
   assert(target >= 0);
   assert(target < osz_);
   if (input.size() == 0) return;
+  
   computeHidden(input, hidden_);
+  
+  // loss functions, 前向和后向
   if (args_->loss == loss_name::ns) {
     loss_ += negativeSampling(target, lr);
   } else if (args_->loss == loss_name::hs) {
@@ -235,9 +253,11 @@ void Model::update(const std::vector<int32_t>& input, int32_t target, real lr) {
   }
   nexamples_ += 1;
 
+  // backprop
   if (args_->model == model_name::sup) {
     grad_.mul(1.0 / input.size());
   }
+  //将 hidden_ 上的梯度传播到 wi_ 上的对应行
   for (auto it = input.cbegin(); it != input.cend(); ++it) {
     wi_->addRow(grad_, *it, 1.0);
   }

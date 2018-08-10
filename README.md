@@ -1,32 +1,35 @@
 ## Table of contents
 
-* [Introduction](#introduction)
-* [Resources](#resources)
-   * [Models](#models)
-   * [Supplementary data](#supplementary-data)
-   * [FAQ](#faq)
-   * [Cheatsheet](#cheatsheet)
-* [Requirements](#requirements)
-* [Building fastText](#building-fasttext)
-   * [Getting the source code](#getting-the-source-code)
-   * [Building fastText using make (preferred)](#building-fasttext-using-make-preferred)
-   * [Building fastText using cmake](#building-fasttext-using-cmake)
-   * [Building fastText for Python](#building-fasttext-for-python)
-* [Example use cases](#example-use-cases)
-   * [Word representation learning](#word-representation-learning)
-   * [Obtaining word vectors for out-of-vocabulary words](#obtaining-word-vectors-for-out-of-vocabulary-words)
-   * [Text classification](#text-classification)
-* [Full documentation](#full-documentation)
-* [References](#references)
-   * [Enriching Word Vectors with Subword Information](#enriching-word-vectors-with-subword-information)
-   * [Bag of Tricks for Efficient Text Classification](#bag-of-tricks-for-efficient-text-classification)
-   * [FastText.zip: Compressing text classification models](#fasttextzip-compressing-text-classification-models)
-* [Join the fastText community](#join-the-fasttext-community)
-* [License](#license)
+- [Table of contents](#table-of-contents)
+- [Introduction](#introduction)
+- [Resources](#resources)
+  - [Models](#models)
+  - [Supplementary data](#supplementary-data)
+  - [FAQ](#faq)
+  - [Cheatsheet](#cheatsheet)
+- [Requirements](#requirements)
+- [Building fastText](#building-fasttext)
+  - [Getting the source code](#getting-the-source-code)
+  - [Building fastText using make (preferred)](#building-fasttext-using-make-preferred)
+  - [Building fastText using cmake](#building-fasttext-using-cmake)
+  - [Building fastText for Python](#building-fasttext-for-python)
+- [Example use cases](#example-use-cases)
+  - [Word representation learning](#word-representation-learning)
+  - [Obtaining word vectors for out-of-vocabulary words](#obtaining-word-vectors-for-out-of-vocabulary-words)
+  - [Text classification](#text-classification)
+- [Full documentation](#full-documentation)
+- [References](#references)
+  - [Enriching Word Vectors with Subword Information](#enriching-word-vectors-with-subword-information)
+  - [Bag of Tricks for Efficient Text Classification](#bag-of-tricks-for-efficient-text-classification)
+  - [FastText.zip: Compressing text classification models](#fasttextzip-compressing-text-classification-models)
+- [Join the fastText community](#join-the-fasttext-community)
+- [License](#license)
 
 ## Introduction
 
 [fastText](https://fasttext.cc/) is a library for efficient learning of word representations and sentence classification.
+
+[read the source code of fastText, 中文](https://heleifz.github.io/14732610572844.html)
 
 ## Resources
 

@@ -327,12 +327,16 @@ void FastText::quantize(const Args qargs) {
 
 // https://heleifz.github.io/14732610572844.html
 
+
 void FastText::supervised(
     Model& model,
     real lr,
     const std::vector<int32_t>& line,
     const std::vector<int32_t>& labels) {
   if (labels.size() == 0 || line.size() == 0) return;
+  // 因为一个句子可以打上多个 label，但是 fastText 的架构实际上只有支持一个 label
+  // 所以这里随机选择一个 label 来更新模型，这样做会让其它 label 被忽略
+  // 所以 fastText 不太适合做多标签的分类
   std::uniform_int_distribution<> uniform(0, labels.size() - 1);
   int32_t i = uniform(model.rng);
   model.update(line, labels[i], lr);
@@ -341,28 +345,34 @@ void FastText::supervised(
 void FastText::cbow(Model& model, real lr,
                     const std::vector<int32_t>& line) {
   std::vector<int32_t> bow;
+  // 在一个句子中，每个词可以进行一次 update
   std::uniform_int_distribution<> uniform(1, args_->ws);
   for (int32_t w = 0; w < line.size(); w++) {
+    // 一个词的上下文长度是随机产生的
     int32_t boundary = uniform(model.rng);
     bow.clear();
+    // 以当前词为中心，将左右 boundary 个词加入 input
     for (int32_t c = -boundary; c <= boundary; c++) {
       if (c != 0 && w + c >= 0 && w + c < line.size()) {
         const std::vector<int32_t>& ngrams = dict_->getSubwords(line[w + c]);
         bow.insert(bow.end(), ngrams.cbegin(), ngrams.cend());
       }
     }
+    // 完成一次 CBOW 更新
     model.update(bow, line[w], lr);
   }
 }
 
 void FastText::skipgram(Model& model, real lr,
                         const std::vector<int32_t>& line) {
-  std::uniform_int_distribution<> uniform(1, args_->ws);
+  std:: <> uniform(1, args_->ws);
   for (int32_t w = 0; w < line.size(); w++) {
     int32_t boundary = uniform(model.rng);
+    // 采用词+word n-gram 来预测这个词的上下文的所有的词
     const std::vector<int32_t>& ngrams = dict_->getSubwords(line[w]);
     for (int32_t c = -boundary; c <= boundary; c++) {
       if (c != 0 && w + c >= 0 && w + c < line.size()) {
+      // 在 skipgram 中，对上下文的每一个词分别更新一次模型
         model.update(ngrams, line[w + c], lr);
       }
     }
@@ -396,6 +406,7 @@ std::tuple<int64_t, double, double> FastText::test(
       nexamples, precision / npredictions, precision / nlabels);
 }
 
+// compute, call model_->predict
 void FastText::predict(
   std::istream& in,
   int32_t k,
@@ -416,6 +427,7 @@ void FastText::predict(
   }
 }
 
+// print
 void FastText::predict(
   std::istream& in,
   int32_t k,
