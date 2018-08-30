@@ -53,7 +53,7 @@ void Model::setQuantizePointer(std::shared_ptr<QMatrix> qwi,
   }
 }
 
-// 前向和后向 
+// 二分类损失，包括前向和后向 
 real Model::binaryLogistic(int32_t target, bool label, real lr) {
   // 内积，sigmoid
   real score = sigmoid(wo_->dotRow(hidden_, target));
@@ -136,6 +136,7 @@ real Model::softmax(int32_t target, real lr) {
   return -log(output_[target]);
 }
 
+// 将输入词（ngram）向量平均，保存到hidden里
 void Model::computeHidden(const std::vector<int32_t>& input, Vector& hidden) const {
   assert(hidden.size() == hsz_);
   hidden.zero();
@@ -197,6 +198,7 @@ void Model::findKBest(
     if (heap.size() == k && std_log(output[i]) < heap.front().first) {
       continue;
     }
+    // 使用一个堆来保存 topK 的结果，这是算 topK 的标准做法
     heap.push_back(std::make_pair(std_log(output[i]), i));
     std::push_heap(heap.begin(), heap.end(), comparePairs);
     if (heap.size() > k) {
@@ -215,6 +217,7 @@ void Model::dfs(int32_t k, real threshold, int32_t node, real score,
   }
 
   if (tree[node].left == -1 && tree[node].right == -1) {
+    // 只输出叶子节点的结果
     heap.push_back(std::make_pair(score, node));
     std::push_heap(heap.begin(), heap.end(), comparePairs);
     if (heap.size() > k) {
@@ -224,13 +227,14 @@ void Model::dfs(int32_t k, real threshold, int32_t node, real score,
     return;
   }
 
+  // 将 score 累加后递归向下收集结果
   real f;
   if (quant_ && args_->qout) {
     f= qwo_->dotRow(hidden, node - osz_);
   } else {
     f= wo_->dotRow(hidden, node - osz_);
   }
-  f = 1. / (1 + std::exp(-f));
+  f = 1. / (1 + std::exp(-f));// sigmoid
 
   dfs(k, threshold, tree[node].left, score + std_log(1.0 - f), heap, hidden);
   dfs(k, threshold, tree[node].right, score + std_log(f), heap, hidden);
@@ -241,6 +245,7 @@ void Model::update(const std::vector<int32_t>& input, int32_t target, real lr) {
   assert(target < osz_);
   if (input.size() == 0) return;
   
+  // 将输入词（ngram）向量平均，保存到hidden里
   computeHidden(input, hidden_);
   
   // loss functions, 前向和后向
@@ -297,6 +302,28 @@ int32_t Model::getNegative(int32_t target) {
 }
 
 void Model::buildTree(const std::vector<int64_t>& counts) {
+  /*构建 Huffman 树的思想：
+      1.  找到当前权重最小（出现频率低）的两个子树，将它们合并成为新树，
+          用新树来替换原来两个子树，直到只剩下一个树
+      2.  哈弗曼树是一种带权路径长度最短的二叉树，可用来构造最优编码
+      3.  叶子节点表示词，中间节点表示隐含的词类别
+    
+    二叉树节点个数：
+      n = n0+n1+n2, n0: 度为0的节点，叶子节点
+      n0 = n2+1
+    最优二叉树：n1 = 0
+               n = n0 + 0 + n0-1 = 2*n0 - 1
+
+    算法：
+      1. 对输入的叶子节点进行一次排序，复杂度为 O(nlogn) ，
+      2. 确定两个下标 leaf 和 node，
+         leaf 总是指向当前最小的叶子节点，
+         node 总是指向当前最小的非叶子节点，所以，
+         最小的两个节点可以从 leaf, leaf - 1, node, node + 1 四个位置中取得
+      3. 对每个叶子节点遍历一遍，用2的方法算出节点，总复杂度为 O(n)
+      算法整体时间复杂度为 O(nlogn)，空间复杂度为O(1)。
+  */
+  // 分配所有节点的空间
   tree.resize(2 * osz_ - 1);
   for (int32_t i = 0; i < 2 * osz_ - 1; i++) {
     tree[i].parent = -1;
@@ -305,13 +332,23 @@ void Model::buildTree(const std::vector<int64_t>& counts) {
     tree[i].count = 1e15;
     tree[i].binary = false;
   }
+
+  // counts 数组保存每个叶子节点的词频，降序排列
+  // 叶子节点保存在前`osz_`位置里
   for (int32_t i = 0; i < osz_; i++) {
     tree[i].count = counts[i];
   }
+  
+  // leaf 指向当前未处理的叶子节点的最后一个，也就是权值最小的叶子节点
+  // node 指向当前未处理的非叶子节点的第一个，也是权值最小的非叶子节点
   int32_t leaf = osz_ - 1;
   int32_t node = osz_;
+  
+  // 逐个构造所有非叶子节点（i >= osz_, i < 2 * osz - 1)
   for (int32_t i = osz_; i < 2 * osz_ - 1; i++) {
+    // 当前最小两个节点的下标
     int32_t mini[2];
+    // 最小的两个节点可以从 leaf, leaf - 1, node, node + 1 四个位置中取得
     for (int32_t j = 0; j < 2; j++) {
       if (leaf >= 0 && tree[leaf].count < tree[node].count) {
         mini[j] = leaf--;
@@ -319,19 +356,23 @@ void Model::buildTree(const std::vector<int64_t>& counts) {
         mini[j] = node++;
       }
     }
+    
+    // 更新非叶子节点的属性
     tree[i].left = mini[0];
     tree[i].right = mini[1];
     tree[i].count = tree[mini[0]].count + tree[mini[1]].count;
     tree[mini[0]].parent = i;
     tree[mini[1]].parent = i;
-    tree[mini[1]].binary = true;
+    tree[mini[1]].binary = true;// 右子树编码为1
   }
+  
+  // 计算霍夫曼编码
   for (int32_t i = 0; i < osz_; i++) {
     std::vector<int32_t> path;
     std::vector<bool> code;
     int32_t j = i;
     while (tree[j].parent != -1) {
-      path.push_back(tree[j].parent - osz_);
+      path.push_back(tree[j].parent - osz_); // path to root, 让中间节点从0开始编码
       code.push_back(tree[j].binary);
       j = tree[j].parent;
     }

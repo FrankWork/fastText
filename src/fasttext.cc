@@ -697,13 +697,17 @@ void FastText::train(const Args args) {
    // fastText 用了word n-gram 作为输入，所以输入矩阵的大小为 (nwords + ngram 种类) * dim
    // 代码中，所有 word n-gram 都被 hash 到固定数目的 bucket 中，所以输入矩阵的大小为
    // (nwords + bucket 个数) * dim
+
+    // (词数 + ngram数) * 词向量维度
     input_ = std::make_shared<Matrix>(dict_->nwords()+args_->bucket, args_->dim);
     input_->uniform(1.0 / args_->dim);
   }
 
   if (args_->model == model_name::sup) {
+    // 有监督分类：标签数 * 词向量维度
     output_ = std::make_shared<Matrix>(dict_->nlabels(), args_->dim);
   } else {
+    // 无监督词向量：词数量 * 词向量维度
     output_ = std::make_shared<Matrix>(dict_->nwords(), args_->dim);
   }
   output_->zero();

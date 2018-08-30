@@ -32,12 +32,12 @@ struct Node {
 
 class Model {
   protected:
-    std::shared_ptr<Matrix> wi_; // input word vector
-    std::shared_ptr<Matrix> wo_; // output word/label vector
+    std::shared_ptr<Matrix> wi_; // input word vector, `FastText`里的`input_`
+    std::shared_ptr<Matrix> wo_; // output word/label vector, `FastText`里的`output_`
     std::shared_ptr<QMatrix> qwi_; // quantized `wi_`, for command `fasttext quantize` 
     std::shared_ptr<QMatrix> qwo_; // quantized `wo_`
     std::shared_ptr<Args> args_;
-    Vector hidden_;
+    Vector hidden_; // 输入的平均词向量
     Vector output_;
     Vector grad_;
     int32_t hsz_; // hidden size
@@ -50,9 +50,9 @@ class Model {
     std::vector<int32_t> negatives_;
     size_t negpos;
     // used for hierarchical softmax:
-    std::vector< std::vector<int32_t> > paths;
-    std::vector< std::vector<bool> > codes;
-    std::vector<Node> tree;
+    std::vector< std::vector<int32_t> > paths;  // 哈夫曼路径
+    std::vector< std::vector<bool> > codes;     // 哈夫曼编码
+    std::vector<Node> tree; // 哈夫曼树
 
     static bool comparePairs(const std::pair<real, int32_t>&,
                              const std::pair<real, int32_t>&);
