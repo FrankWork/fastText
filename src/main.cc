@@ -288,6 +288,7 @@ void analogies(const std::vector<std::string> args) {
   exit(0);
 }
 
+// 调用FastText类训练词向量
 void train(const std::vector<std::string> args) {
   Args a = Args();
   a.parseArgs(args);
